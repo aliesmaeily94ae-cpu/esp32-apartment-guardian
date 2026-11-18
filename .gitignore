@@ -1,0 +1,19 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Secrets (Wi-Fi passwords etc.)
+firmware/include/secrets.h
+
+# OS files
+.DS_Store
+Thumbs.db
