@@ -84,5 +84,3 @@ sauna heater. Electronics stay outside the sauna room.
 ## Author
 
 **Ali Esmaeili**, Computing and Electrical Engineering student, Tampere University
-# esp32-sauna-monitor
-ESP32-based sauna temperature &amp; humidity monitor with OLED display and Wi-Fi dashboard
