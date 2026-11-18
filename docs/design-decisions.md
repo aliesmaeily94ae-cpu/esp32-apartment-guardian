@@ -2,39 +2,46 @@
 
 This file explains *why* the project is built the way it is.
 
-## 1. Temperature sensor: DS18B20 waterproof probe
+## 1. Analog sensors on ADC1 pins (GPIO 32–39)
 
-**Problem:** a sauna is usually 70–100 °C. Many common hobby sensors (for example
-the DHT11 or DHT22) are only rated up to about 50–80 °C.
+The ESP32 has two ADCs (analog-to-digital converters). **ADC2 cannot be used
+while Wi-Fi is on**, because the Wi-Fi driver uses it. This project uses Wi-Fi,
+so the analog sensors (water sensor and sound sensor) are connected to
+**ADC1 pins**: GPIO 34 and GPIO 35.
 
-**Choice:** DS18B20 in a stainless-steel waterproof probe.
+GPIO 34–39 are also **input-only** pins, which is fine for sensors and keeps
+output-capable pins free for the LED and buzzer.
 
-**Reasons:**
-- Rated from −55 °C to +125 °C, so it covers sauna temperatures with margin.
-- Digital output (1-Wire): long cables do not add measurement error like they
-  would with an analog sensor.
-- Only one GPIO pin needed, and several sensors can share the same wire later
-  (for example one near the ceiling and one near the bench).
-- Cheap and widely available.
+## 2. The water sensor is powered from a GPIO pin
 
-**Trade-off:** a reading takes up to ~750 ms at 12-bit resolution, which is
-slow, but more than fast enough for a sauna that heats up over 30–60 minutes.
+**Problem:** the water sensor has bare copper tracks. If current flows through
+them all the time, they corrode (electrolysis) and the sensor stops working
+within weeks.
 
-## 2. Electronics stay outside the sauna
-
-**Problem:** high temperature and humidity damage electronics and USB power
-supplies.
-
-**Choice:** only the sensor probes go into the sauna through the wall or door
-gap. The ESP32, display and power supply stay outside.
+**Choice:** the sensor's power pin is connected to GPIO 26 instead of 3.3 V. The
+ESP32 turns the sensor on only for a few milliseconds when it takes a reading,
+for example once per second.
 
 ## 3. Non-blocking code (`millis()` instead of `delay()`)
 
-`delay()` stops the whole program. Later the ESP32 must update the display,
-handle Wi-Fi and check the alert at the same time, so the code uses `millis()`
-timing from the start.
+`delay()` stops the whole program. The ESP32 has to read sensors, update the
+display, react to buttons and serve a web page at the same time, so all timing
+uses `millis()` from the start.
 
-## 4. Humidity sensor (Milestone 2): *to be decided*
+## 4. Buttons use internal pull-up resistors
 
-TODO: compare candidate sensors (operating temperature range, humidity
-accuracy at high temperature, interface, price) and write the decision here.
+The buttons connect a GPIO pin to GND. The ESP32's internal pull-up
+(`INPUT_PULLUP`) keeps the pin HIGH when the button is not pressed, so no
+external resistors are needed. Pressed = LOW.
+
+## 5. DHT11 instead of a more accurate sensor
+
+The DHT11 was already available, and ±2 °C / ±5 % RH is enough to detect
+trends such as dry winter air or a humid bathroom. A more accurate sensor
+(for example an SHT31) could replace it later without changing the overall design.
+
+## 6. Status shown three ways
+
+- **OLED:** exact values, when you are near the device
+- **RGB LED:** status at a glance from across the room
+- **Buzzer:** only for real alarms (water leak), so it is not ignored
