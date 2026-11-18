@@ -1,42 +1,39 @@
 /*
- * ESP32 Sauna Monitor - Milestone 1
- * ---------------------------------
- * Goal: read the sauna temperature from a DS18B20 probe and print it
- *       to the serial monitor once per second.
+ * ESP32 Apartment Guardian - Milestone 1
+ * --------------------------------------
+ * Goal: read indoor temperature and humidity from a DHT11 sensor and
+ *       print them to the serial monitor every 2 seconds.
  *
  * Wiring (see docs/wiring.md):
- *   DS18B20 red    -> 3.3V
- *   DS18B20 black  -> GND
- *   DS18B20 yellow -> GPIO 4  (+ 4.7 kOhm pull-up resistor to 3.3V)
+ *   DHT11 VCC  -> 3.3V
+ *   DHT11 GND  -> GND
+ *   DHT11 DATA -> GPIO 4
+ *   (bare 4-pin DHT11 only: add a 10 kOhm pull-up from DATA to 3.3V;
+ *    3-pin modules already have one on the board)
  *
  * Author: Ali Esmaeili
  */
 
 #include <Arduino.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+#include <DHT.h>
 
 // ---- Configuration --------------------------------------------------------
 
-// GPIO pin for the DS18B20 data line.
-// GPIO 4 is a safe general-purpose pin on the ESP32 (it is not used
-// during boot, unlike GPIO 0, 2, 12 and 15).
-constexpr uint8_t ONE_WIRE_PIN = 4;
+// GPIO 4 is a safe general-purpose pin on the ESP32 (it is not a
+// boot-strapping pin like GPIO 0, 2, 12 or 15).
+constexpr uint8_t DHT_PIN = 4;
 
-// How often we read the sensor, in milliseconds.
-constexpr uint32_t READ_INTERVAL_MS = 1000;
+// The DHT11 can only give a new measurement about once per second.
+// Reading faster just returns old or invalid data, so we use 2 seconds.
+constexpr uint32_t READ_INTERVAL_MS = 2000;
 
 // ---- Objects --------------------------------------------------------------
 
-// OneWire handles the low-level 1-Wire protocol (timing of bits on one wire).
-OneWire oneWire(ONE_WIRE_PIN);
-
-// DallasTemperature uses OneWire to talk to the DS18B20 specifically.
-DallasTemperature sensors(&oneWire);
+DHT dht(DHT_PIN, DHT11);
 
 // Time of the last reading. We use millis() instead of delay() so the
-// loop never "freezes". This matters later, when the ESP32 also has to
-// update a display and answer Wi-Fi requests at the same time.
+// loop never "freezes". This matters later, when the ESP32 must also
+// watch the water sensor, update the display and answer Wi-Fi requests.
 uint32_t lastReadMs = 0;
 
 // ---- Setup ----------------------------------------------------------------
@@ -45,16 +42,11 @@ void setup() {
     Serial.begin(115200);
     delay(500);  // give the serial monitor a moment to connect
 
-    sensors.begin();
+    dht.begin();
 
     Serial.println();
-    Serial.println("ESP32 Sauna Monitor - Milestone 1");
-    Serial.print("DS18B20 sensors found: ");
-    Serial.println(sensors.getDeviceCount());
-
-    if (sensors.getDeviceCount() == 0) {
-        Serial.println("No sensor found. Check wiring and the 4.7k pull-up resistor.");
-    }
+    Serial.println("ESP32 Apartment Guardian - Milestone 1");
+    Serial.println("Reading DHT11 every 2 seconds...");
 }
 
 // ---- Main loop ------------------------------------------------------------
@@ -67,19 +59,23 @@ void loop() {
     if (now - lastReadMs >= READ_INTERVAL_MS) {
         lastReadMs = now;
 
-        sensors.requestTemperatures();            // start a conversion
-        float tempC = sensors.getTempCByIndex(0); // read the first sensor
+        float humidity = dht.readHumidity();      // relative humidity, %
+        float tempC    = dht.readTemperature();   // degrees Celsius
 
-        // The library returns DEVICE_DISCONNECTED_C (-127) on error.
-        if (tempC == DEVICE_DISCONNECTED_C) {
-            Serial.println("Error: sensor disconnected");
-        } else {
-            Serial.print("Temperature: ");
-            Serial.print(tempC, 1);
-            Serial.println(" C");
+        // If the sensor does not answer, the library returns NaN
+        // ("not a number"). isnan() checks for that.
+        if (isnan(humidity) || isnan(tempC)) {
+            Serial.println("Error: could not read DHT11. Check the wiring.");
+            return;
         }
+
+        Serial.print("Temperature: ");
+        Serial.print(tempC, 1);
+        Serial.print(" C   Humidity: ");
+        Serial.print(humidity, 0);
+        Serial.println(" %");
     }
 
-    // TODO (Milestone 2): read humidity sensor here
-    // TODO (Milestone 3): update OLED display here
+    // TODO (Milestone 2): update the OLED display here
+    // TODO (Milestone 3): check the water sensor here
 }
